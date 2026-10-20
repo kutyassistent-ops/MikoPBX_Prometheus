@@ -6,6 +6,10 @@ MikoPBX module that exposes metrics in the Prometheus text exposition
 format (0.0.4) over HTTP. Prometheus pulls the endpoint directly - no
 push agent like Zabbix requires.
 
+![Module settings page](docs/screenshot-settings.jpg)
+
+Version `1.4.3` · GPL-3.0-or-later · PHP 8.4 · MikoPBX 2025.1.1+
+
 ## What it exposes
 
 `GET http://<mikopbx>:9713/metrics`
@@ -38,9 +42,20 @@ fails), `/-/info` (JSON counters of the exporter), `HEAD` support and gzip.
 
 ## Installation
 
-1. Take `ModulePrometheus.zip` from the releases, or build it from source.
+1. Take the ready archive `dist/ModulePrometheus-1.4.3.zip` from this
+   repository (or build it from source - see below).
 2. In the MikoPBX web interface: **Modules** -> **Installed** -> **Upload module**.
 3. Enable the module. The exporter starts automatically.
+
+### Build from source
+
+```powershell
+# собирает dist/ModulePrometheus-<версия>.zip и проверяет раскладку
+.\build-module.ps1
+```
+
+The script refuses to build an archive with `module.json` anywhere but the
+root, and fails if a `bin/*.sh` file has CRLF line endings.
 
 > [!danger] Archive layout
 > `module.json` must sit at the **root** of the zip. Inside a
@@ -116,6 +131,46 @@ scrape_configs:
   not only `collector_success`.
 - The Grafana dashboard is not shipped; ready-made alert rules are.
 
+## Repository layout
+
+```
+ModulePrometheus/
+├── App/                          module entry point, controller, form, settings view
+├── Lib/
+│   ├── WorkerPrometheusExporter.php   long-running worker: socket, fork, cache, token
+│   ├── Collectors/                   System, Asterisk, Telemetry, CallStats, Infrastructure
+│   ├── MetricsCollector.php          collector interface
+│   ├── PrometheusConf.php            settings
+│   ├── PrometheusMain.php            module entry logic
+│   ├── StatsCache.php                cron CDR cache
+│   └── RestAPI/Status/               REST API v3 for the UI
+├── Messages/                      ru / en translations
+├── Models/                        settings model
+├── Setup/                         install and update
+├── public/assets/                 css, js, logo
+├── bin/                           exporter, liveness check, cache refresh
+├── agi-bin/, db/                  placeholders required by the installer
+├── docs/                          documentation (RU), screenshot
+├── examples/alerts.yml             15 alert rules and 7 recording rules
+├── dist/                          ready archive for installation
+├── build-module.ps1               archive builder
+├── CHANGELOG.md                   release history
+├── LICENSE                        GPL-3.0
+└── module.json                    module manifest
+```
+
+## Documentation
+
+- [`docs/Обзор модуля.md`](docs/Обзор%20модуля.md) - what the module does
+- [`docs/Установка.md`](docs/Установка.md) - installation
+- [`docs/Настройка модуля.md`](docs/Настройка%20модуля.md) - settings
+- [`docs/Подключение Prometheus.md`](docs/Подключение%20Prometheus.md) - server side
+- [`docs/Алертинг и Grafana.md`](docs/Алертинг%20и%20Grafana.md) - alert rules and dashboards
+- [`docs/Справочник метрик.md`](docs/Справочник%20метрик.md) - metric reference
+- [`docs/Архитектура.md`](docs/Архитектура.md) - internals
+- [`docs/Разработка и отладка.md`](docs/Разработка%20и%20отладка.md) - development
+- [`docs/Траблшутинг.md`](docs/Траблшутинг.md) - troubleshooting
+
 ## Development
 
 - `bin/*.sh` must use LF line endings.
@@ -128,3 +183,11 @@ scrape_configs:
 ## License
 
 GPL-3.0-or-later
+
+## Related projects
+
+| Project | Role |
+|---|---|
+| [`grafana-dashboards`](https://github.com/kutyassistent-ops/grafana-dashboards) | Dashboards built on these metrics (MikoPBX, printers, CCTV) |
+| [`grafana-bitrix-relay`](https://github.com/kutyassistent-ops/grafana-bitrix-relay) | Delivers Grafana alerts to Bitrix24 chat |
+| [`MikoPBX_birix_notify`](https://github.com/kutyassistent-ops/MikoPBX_birix_notify) | MikoPBX module: call notifications to Bitrix24 |

@@ -3,3 +3,13 @@
 .DS_Store
 bin/zabbix_agentd
 bin/zabbix_agentd_arm
+
+# Локальное окружение
+.env
+*.log
+/vendor/
+composer.lock
+
+# Архивы сборки, кроме готового dist/*.zip
+*.zip
+!dist/*.zip
