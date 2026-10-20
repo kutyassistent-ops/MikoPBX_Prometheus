@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Сборка архива модуля
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Собрать zip
+        shell: pwsh
+        run: ./build-module.ps1
+
+      - name: Проверить раскладку архива
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = Get-ChildItem -Path dist -Filter *.zip | Select-Object -First 1
+          if (-not $zip) { throw "Архив не собран" }
+
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          $names = @($archive.Entries | ForEach-Object { $_.FullName })
+          $archive.Dispose()
+
+          if ($names -notcontains "module.json") {
+              throw "module.json лежит не в корне архива — установка в MikoPBX упадёт"
+          }
+          $bad = @($names | Where-Object { $_ -like "*\*" })
+          if ($bad.Count -gt 0) {
+              throw "В архиве записи с обратными слэшами: $($bad[0])"
+          }
+          Write-Host "Архив корректен: $($names.Count) записей"
+
+      - name: Отдать собранный архив
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModulePrometheus
+          path: dist/*.zip
+          if-no-files-found: error
+
+  lint:
+    name: Проверка PHP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: php -l по всем файлам
+        run: |
+          find . -name '*.php' -not -path './.git/*' -print0 \
+            | xargs -0 -n1 -P4 php -l
+
+      - name: Убедиться, что нет ключей и токенов
+        run: |
+          if git grep -nEi '(--token|--api-key|password)[[:space:]]*=[[:space:]]*["'"'"'][^"'"'"']{8,}' -- '*.php'; then
+            echo "::error::В коде найдено значение, похожее на секрет"
+            exit 1
+          fi
+          echo "Секретов в коде нет"

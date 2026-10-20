@@ -10,6 +10,8 @@ push agent like Zabbix requires.
 
 Version `1.4.3` · GPL-3.0-or-later · PHP 8.4 · MikoPBX 2025.1.1+
 
+[![CI](https://github.com/kutyassistent-ops/MikoPBX_Prometheus/actions/workflows/ci.yml/badge.svg)](https://github.com/kutyassistent-ops/MikoPBX_Prometheus/actions/workflows/ci.yml)
+
 ## What it exposes
 
 `GET http://<mikopbx>:9713/metrics`
@@ -180,9 +182,50 @@ ModulePrometheus/
   scalars, not arrays - `{{ x.y }}` does not reach into an array.
 - Build with `build-module.ps1`: `module.json` must end up at the zip root.
 
+## Known caveats
+
+> [!warning] Metrics are open to everyone by default
+> A fresh install serves metrics **without** an `Authorization` header and
+> listens on `0.0.0.0`. Enable the bearer token, or restrict the allowed
+> source addresses, or close the port with the module firewall rule. The
+> settings page shows a warning while the metrics are open to everybody.
+
+> [!warning] `cpu="all"` is the sum of the cores, not the average
+> The CPU formula is easy to get wrong: without the `cpu!="all"` filter the
+> load is shown twice as high. Since 1.4.0 the values are real seconds, so
+> no divisor is needed. The old raw counter is still published as
+> `mikopbx_system_cpu_jiffies_total`.
+
+> [!info] Missing metrics do not mean a broken exporter
+> When the Asterisk output format does not match, the parser returns
+> nothing. Check `mikopbx_exporter_block_present` and
+> `mikopbx_exporter_block_absent_reason`, not only `collector_success`.
+
+> [!info] Trunk panels read a cache, not live data
+> The cache is filled by cron every five minutes. Empty bargauge panels
+> usually mean an unfilled cache rather than "no calls". The "cache age"
+> panel tells the two apart.
+
+> [!info] No ready-made Grafana dashboard is shipped
+> Ready alert rules are: 15 rules and 7 recording rules in
+> `examples/alerts.yml`.
+
+> [!danger] `module.json` must sit at the root of the zip
+> Inside a `ModulePrometheus/` folder the install fails with
+> "module.json not found in the module archive".
+
+## Continuous integration
+
+On every push:
+
+- the module archive is built (`build-module.ps1`) and its layout is
+  validated: `module.json` at the root, no entries with backslashes;
+- `php -l` runs over every PHP file;
+- the built archive is uploaded as a run artifact.
+
 ## License
 
-GPL-3.0-or-later
+GPL-3.0-or-later — see [LICENSE](LICENSE).
 
 ## Related projects
 
