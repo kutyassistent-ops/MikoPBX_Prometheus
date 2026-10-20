@@ -1,0 +1,282 @@
+# ==============================================================================
+# MikoPBX - ModulePrometheus
+# Ready-to-use alerting rules. Copy to the Prometheus server, adjust the mount
+# point in prometheus.yml and reload:
+#
+#   rule_files:
+#     - /etc/prometheus/alerts.yml
+#
+# Every expression below uses only mikopbx_* families, so nothing here depends
+# on the Grafana dashboard.
+# ==============================================================================
+groups:
+  - name: mikopbx.exporter
+    rules:
+      - alert: MikoPBXExporterDown
+        expr: up{job="mikopbx"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Экспортёр Prometheus на MikoPBX недоступен"
+          description: >-
+            Prometheus не может получить метрики дольше трёх минут.
+            Проверьте процесс: pgrep -a ModulePrometheusExporter
+
+      - alert: MikoPBXCollectorFailing
+        expr: mikopbx_exporter_collector_success == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Коллектор {{ $labels.collector }} не отдаёт метрики"
+          description: >-
+            Экспортёр жив, но группа {{ $labels.collector }} падает дольше
+            десяти минут. Обычно это недоступный REST API или CLI Asterisk.
+
+      - alert: MikoPBXScrapeSlow
+        expr: >-
+          mikopbx_exporter_scrape_duration_seconds
+            > mikopbx_exporter_scrape_timeout_seconds * 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Сбор метрик приближается к таймауту"
+          description: >-
+            Сбор занимает больше 80% заявленного бюджета. Prometheus
+            начнёт отваливаться по таймауту раньше, чем заметит оператор.
+            Смотрите mikopbx_exporter_collector_duration_seconds.
+
+      - alert: MikoPBXReadinessFailing
+        expr: mikopbx_exporter_collector_success == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Экспортёр не готов отдавать полный набор метрик"
+
+      - alert: MikoPBXScrapeTimeout
+        expr: increase(mikopbx_exporter_scrape_timeouts_total[30m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Сбор не уложился в таймаут"
+          description: >-
+            Сбор прерван по истечении scrape_timeout. Поднимите бюджет
+            в настройках модуля или ускорьте источники данных.
+
+      - alert: MikoPBXAuthFailures
+        expr: increase(mikopbx_exporter_auth_failures_total[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Запросы к /metrics отклоняются"
+          description: >-
+            Токен не совпадает с сохранённым. Проверьте bearer_token_file
+            на стороне Prometheus и значение токена в настройках модуля.
+
+      - alert: MikoPBXBlockMissing
+        expr: mikopbx_exporter_block_present == 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Блок {{ $labels.block }} не отдаёт данные"
+          description: "Причина: {{ $labels.reason }}"
+
+      - alert: MikoPBXExporterNotUp
+        expr: mikopbx_exporter_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Экспортёр не отвечает"
+
+  - name: mikopbx.asterisk
+    rules:
+      - alert: MikoPBXAsteriskDown
+        expr: mikopbx_asterisk_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Asterisk не отвечает на CLI"
+          description: "Проверьте systemctl status asterisk"
+
+      - alert: MikoPBXNoRegisteredTrunks
+        expr: sum(mikopbx_trunk_up) == 0 and sum(mikopbx_sip_trunks) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ни одного зарегистрированного транка"
+
+      - alert: MikoPBXTrunkFlapping
+        expr: increase(mikopbx_trunk_state_transitions_total[30m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Транк {{ $labels.trunk }} постоянно перерегистрируется"
+          description: >-
+            Больше трёх смен состояния регистрации за полчаса. Обычно
+            причина в канале оператора или в NAT-таймаутах.
+
+      - alert: MikoPBXTrunkSaturated
+        expr: mikopbx_trunk_channel_utilization_ratio > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Транк {{ $labels.name }} заполнен более чем на 90%"
+          description: "Звонки могут отклоняться из-за нехватки каналов"
+
+      - alert: MikoPBXQueueBacklog
+        expr: mikopbx_queue_longest_wait_max_seconds > 120
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "В очереди кто-то ждёт больше двух минут"
+          description: "Проверьте операторов очереди"
+
+  - name: mikopbx.telephony
+    rules:
+      - alert: MikoPBXAnswerRateLow
+        expr: >-
+          mikopbx_trunk_answer_rate_ratio{period="hour", direction="all"} < 0.5
+          and mikopbx_trunk_calls{period="hour", direction="all"} > 20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Низкий процент ответа на транке {{ $labels.name }}"
+          description: "Меньше половины звонков отвечено за последний час"
+
+      - alert: MikoPBXSipPeersOffline
+        expr: >-
+          mikopbx_sip_peers_total > 0
+          and mikopbx_sip_peers_online_ratio < 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Зарегистрировано меньше половины SIP-пиров"
+
+      - alert: MikoPBXStatsCacheStale
+        expr: mikopbx_stats_cache_age_seconds > 900
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Фоновый сбор статистики не обновляется"
+          description: >-
+            Кэш статистики звонков старше 15 минут. Проверьте cron-задачу
+            prometheus-stats-cache.sh.
+
+      - alert: MikoPBXMissedCallsSourceDown
+        expr: mikopbx_stats_cache_missed_error_age_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Источник пропущенных вызовов не отвечает"
+          description: >-
+            Метрика пропущенных по внутренним номерам показывает последние
+            известные значения, но не обновляется больше 15 минут.
+
+  - name: mikopbx.host
+    rules:
+      - alert: MikoPBXDiskFillingUp
+        expr: >-
+          mikopbx_system_filesystem_used_ratio{mountpoint="/storage"} > 0.85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "На /storage занято больше 85%"
+          description: "Место почти закончится; CDR и записи будут теряться"
+
+      - alert: MikoPBXDiskAlmostFull
+        expr: >-
+          mikopbx_system_filesystem_size_bytes{mountpoint="/storage"} > 0
+          and mikopbx_system_filesystem_available_bytes{mountpoint="/storage"}
+            / mikopbx_system_filesystem_size_bytes{mountpoint="/storage"} < 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "На /storage осталось меньше 5%"
+
+      # Самая недооценённая причина «диск полон» при 5% свободных байтов
+      - alert: MikoPBXInodesAlmostFull
+        expr: >-
+          mikopbx_system_filesystem_inodes_used_ratio{mountpoint="/storage"} > 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "На /storage кончаются иноды при свободных байтах"
+          description: >-
+            Забито не место, а количество файлов. used_ratio по байтам это
+            не покажет - смотрите inodes_used_ratio.
+
+      - alert: MikoPBXMemoryPressure
+        expr: >-
+          mikopbx_system_memory_total_bytes > 0
+          and mikopbx_system_memory_available_bytes
+            / mikopbx_system_memory_total_bytes < 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Свободно меньше 10% оперативной памяти"
+
+      - alert: MikoPBXOomKill
+        expr: increase(mikopbx_kernel_oom_kills_total[1h]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ядро убило процесс по нехватке памяти"
+          description: "Смотрите dmesg -T | grep -i 'out of memory'"
+
+      - alert: MikoPBXTimeOutOfSync
+        expr: mikopbx_time_sync_leap_status == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Часы АТС не синхронизированы"
+          description: >-
+            Метрики CDR разъезжаются по времени, отчёты и корреляция
+            событий становятся недостоверными.
+
+  - name: mikopbx.recording
+    rules:
+      # Пороговые правила собирают длинные выражения в именованные ряды
+      - record: pbx:filesystem_available_ratio
+        expr: >-
+          mikopbx_system_filesystem_available_bytes / mikopbx_system_filesystem_size_bytes
+
+      - record: pbx:filesystem_inode_ratio
+        expr: >-
+          mikopbx_system_filesystem_inodes_free / mikopbx_system_filesystem_inodes_total
+
+      - record: pbx:cpu_busy_ratio
+        expr: sum(rate(mikopbx_system_cpu_seconds_total{mode!="idle", cpu!="all"}[5m])) / count(count by (cpu) (mikopbx_system_cpu_seconds_total{cpu!="all"}))
+
+      - record: pbx:memory_used_ratio
+        expr: >-
+          mikopbx_system_memory_used_bytes / mikopbx_system_memory_total_bytes
+
+      - record: pbx:calls_active_total
+        expr: sum(mikopbx_calls_active_by_direction)
+
+      - record: pbx:trunks_down_total
+        expr: count(mikopbx_trunk_up == 0)
+
+      - record: pbx:queue_waiters_total
+        expr: sum(mikopbx_queue_callers)

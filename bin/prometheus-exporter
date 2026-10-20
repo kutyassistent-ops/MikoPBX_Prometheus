@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Launcher for the Prometheus exporter worker.
+# The worker binds the configured TCP port and serves /metrics.
+MODULE_DIR="$(/bin/busybox dirname "$(/bin/busybox dirname "$0")")"
+
+exec php -f "$MODULE_DIR/Lib/WorkerPrometheusExporter.php" "$@"

@@ -1,0 +1,62 @@
+/*
+ * ModulePrometheus - Prometheus exporter for MikoPBX
+ * Copyright (C) 2026 Community
+ *
+ * Custom styles for the module page. The default Semantic UI styles cover
+ * the layout; this file is kept for future tweaks.
+ */
+
+/* Inline feedback under the "download scrape config" button */
+.prom-inline-message {
+    margin: 0.5em 0 0;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.prom-inline-message.prom-error {
+    color: #9f3a38;
+}
+
+.prom-inline-message.prom-ok {
+    color: #21ba45;
+}
+
+/* Bearer token visibility toggle sits inside .ui.icon.input */
+.ui.icon.input #prom-auth-token-toggle {
+    cursor: pointer;
+    pointer-events: auto;
+    opacity: 0.6;
+}
+
+.ui.icon.input #prom-auth-token-toggle:hover {
+    opacity: 1;
+}
+
+/* The metrics URL in the status panel is a link, not a plain text */
+#prom-status-url {
+    font-family: monospace;
+    word-break: break-all;
+}
+
+#prom-status-url[href="#"] {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Inline hints under the settings fields */
+.module-prometheus-form .help-text,
+#module-prometheus-form .help-text {
+    font-size: 0.85em;
+    opacity: 0.75;
+    margin-top: 0.3em;
+}
+
+/* The risk banner is only shown when the metrics are open to everybody */
+#prom-risk-banner p {
+    margin: 0;
+}
+
+/* Buttons of the action row keep the same baseline */
+#module-prometheus-form > .ui.button {
+    margin-right: 0.5em;
+}

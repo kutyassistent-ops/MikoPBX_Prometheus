@@ -1,0 +1,38 @@
+{
+    "name": "mikopbx/moduleprometheus",
+    "description": "ModulePrometheus - Prometheus exporter for MikoPBX",
+    "require": {
+        "php": "~8.4",
+        "ext-phalcon": "^5.0",
+        "mikopbx/core": ">=2025.1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ModulePrometheus\\": "/"
+        }
+    },
+    "type": "library",
+    "keywords": [
+        "pbx",
+        "asterisk",
+        "mikopbx",
+        "prometheus",
+        "monitoring",
+        "metrics",
+        "voip"
+    ],
+    "license": "GPL-3.0-or-later",
+    "homepage": "https://github.com/mikopbx/Core",
+    "support": {
+        "email": "help@mikopbx.com",
+        "wiki": "https://wiki.mikopbx.com",
+        "issues": "https://github.com/mikopbx/Core/issues",
+        "forum": "https://qa.mikopbx.ru"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.4.14"
+        }
+    }
+}
